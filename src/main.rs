@@ -55,12 +55,11 @@ impl Epoll {
             }
             ret.epfd = r;
         }
-        println!("Created epoll fd:{}", ret.epfd);
+        println!("epoll:create epfd:{}", ret.epfd);
         ret
     }
 
     pub fn ctl_add_rawfd(&self, fd: RawFd, waker: Waker, events: u32) -> Result<(), io::Error> {
-        println!("ctl_add_rawfd");
         let mut wakers = self.wakers.lock().unwrap();
         let mut event = libc::epoll_event {
             events: events,
@@ -72,21 +71,19 @@ impl Epoll {
                 let se = libc::strerror(*libc::__errno_location());
                 CStr::from_ptr(se).to_string_lossy()
             };
-            println!("ctl_rawfd:error: {}", strerror);
+            println!("epoll:ctl_add_rawfd:error: {}", strerror);
             return Err(io::Error::new(io::ErrorKind::Other, strerror));
         }
         if let Some(wakers) = wakers.insert(fd, vec![waker]) {
-            println!("Added waker for fd:{}", fd);
             for w in wakers {
                 w.wake();
             }
         }
-        println!("Added fd:{} to epollfd:{}", fd, self.epfd);
+        println!("epoll:ctl_add_rawfd fd:{} to epfd:{}", fd, self.epfd);
         Ok(())
     }
 
     pub fn ctl_mod_rawfd(&self, fd: RawFd, waker: Waker, events: u32) -> Result<(), io::Error> {
-        println!("ctl_mod_rawfd");
         let mut wakers = self.wakers.lock().unwrap();
         let mut event = libc::epoll_event {
             events: events,
@@ -98,23 +95,19 @@ impl Epoll {
                 let se = libc::strerror(*libc::__errno_location());
                 CStr::from_ptr(se).to_string_lossy()
             };
-            println!("ctl_rawfd:error: {}", strerror);
+            println!("epoll:ctl_mod_rawfd:error: {}", strerror);
             return Err(io::Error::new(io::ErrorKind::Other, strerror));
         }
         if let Some(wakers) = wakers.insert(fd, vec![waker]) {
             for w in wakers {
                 w.wake();
             }
-            println!("Added waker for fd:{}", fd);
         }
-        println!("Added fd:{} to epollfd:{}", fd, self.epfd);
+        println!("epoll:ctl_mod_rawfd fd:{} in epfd:{}", fd, self.epfd);
         Ok(())
     }
 
     pub fn ctl_del_rawfd(&self, fd: RawFd) -> Result<(), io::Error> {
-        //Pull all associated wakers out, and notify them, and then delete the fd from this epoll
-        //list
-        println!("ctl_del_rawfd");
         let mut wakers = self.wakers.lock().unwrap();
         let mut event = libc::epoll_event {
             events: 0,
@@ -126,16 +119,15 @@ impl Epoll {
                 let se = libc::strerror(*libc::__errno_location());
                 CStr::from_ptr(se).to_string_lossy()
             };
-            println!("ctl_rawfd:error: {}", strerror);
+            println!("epoll:ctl_del_rawfd:error: {}", strerror);
             return Err(io::Error::new(io::ErrorKind::Other, strerror));
         }
         if let Some(wakers) = wakers.remove(&fd) {
-            println!("ctl_del_rawfd:Removing waker for fd:{}", fd);
             for w in wakers {
                 w.wake();
             }
         }
-        println!("ctl_del_rawfd: fd:{} from epollfd:{}", fd, self.epfd);
+        println!("epoll:ctl_del_rawfd: fd:{} from epfd:{}", fd, self.epfd);
         Ok(())
     }
 
@@ -152,7 +144,7 @@ impl Epoll {
         }
         //Turn the events array into a vec of file handles
         for event in events.iter().take(nfds as usize) {
-            println!("Wait: {} for {}", event.events, event.u64);
+            println!("epoll:wait: event:{} for fd:{}", event.events, event.u64);
             {
                 let mut wakers = self.wakers.lock().unwrap();
                 if let Some(wakers) = wakers.remove(&(event.u64 as RawFd)) {
@@ -174,7 +166,15 @@ impl AsRawFd for Epoll {
 
 impl Drop for Epoll {
     fn drop(&mut self) {
-        //TODO Drop this thing
+        //Drop this thing
+        let r = unsafe { libc::close(self.epfd) };
+        if r == -1 {
+            let strerror = unsafe {
+                let se = libc::strerror(*libc::__errno_location());
+                CStr::from_ptr(se).to_string_lossy()
+            };
+            println!("epoll:drop:error: {}", strerror);
+        }
     }
 }
 
@@ -219,7 +219,6 @@ impl<'a> TryStream for Incoming<'a> {
                 self.listener.epoll.clone(),
             )))),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                println!("AsyncTcpListener:Stream:Accept would block: {}", e);
                 let events = libc::EPOLLET | libc::EPOLLIN | libc::EPOLLONESHOT;
                 //If I've already added it to epoll, then I just need to modify now
                 if self.listener.eph{
@@ -239,7 +238,7 @@ impl<'a> TryStream for Incoming<'a> {
                 Poll::Pending
             }
             Err(e) => {
-                println!("stream:error {:?}", e);
+                println!("AsyncTcpListener:stream:error {:?}", e);
                 Poll::Ready(None)
                 //panic!("Error on accept: {}", e);
             }
@@ -266,7 +265,6 @@ impl AsyncTcpStream {
 
 impl Drop for AsyncTcpStream {
     fn drop(&mut self){
-        println!("Dropping stream");
         self.epoll.ctl_del_rawfd(self.stream.as_raw_fd());
     }
 }
@@ -281,7 +279,6 @@ impl AsyncRead for AsyncTcpStream {
         match r {
             Ok(i) => Poll::Ready(Ok(i)),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                println!("AsyncStream:Read:Read would block: {}", e);
                 let events = libc::EPOLLET | libc::EPOLLIN | libc::EPOLLONESHOT;
                 if self.eph{
                     self.epoll.ctl_mod_rawfd(
@@ -316,7 +313,6 @@ impl AsyncWrite for AsyncTcpStream {
         match r {
             Ok(i) => Poll::Ready(Ok(i)),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                println!("AsyncStream:Write:write would block: {}", e);
                 let events = libc::EPOLLET | libc::EPOLLOUT | libc::EPOLLONESHOT;
                 if self.eph{
                     self.epoll.ctl_mod_rawfd(
@@ -343,7 +339,6 @@ impl AsyncWrite for AsyncTcpStream {
         match r {
             Ok(()) => Poll::Ready(Ok(())),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                println!("AsyncStream:Write:flush would block: {}", e);
                 let events = libc::EPOLLET | libc::EPOLLOUT | libc::EPOLLONESHOT;
                 if self.eph{
                     self.epoll.ctl_mod_rawfd(
@@ -370,7 +365,6 @@ impl AsyncWrite for AsyncTcpStream {
         match r {
             Ok(()) => Poll::Ready(Ok(())),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                println!("AsyncStream:Write:close would block: {}", e);
                 let events = libc::EPOLLET | libc::EPOLLOUT | libc::EPOLLONESHOT;
                 if self.eph{
                     self.epoll.ctl_mod_rawfd(
@@ -446,15 +440,17 @@ async fn accept_async(mut listener: AsyncTcpListener, mut spawner : LocalSpawner
 }
 
 async fn handle_connection_async(mut stream: AsyncTcpStream, spawner: LocalSpawner) {
-    println!("Handling:started...");
+    println!("handle_connection_async: Handling:started...");
     //stream.shutdown(Shutdown::Both);
     let mut buffer = [0u8; 2048];
     stream.read(&mut buffer).await.unwrap();
+    println!();
     println!("Request: {}", String::from_utf8_lossy(&buffer[..]));
+    println!();
     let response = "HTTP/1.1 200 OK\r\n\r\n";
 
     stream.write_all(response.as_bytes()).await.unwrap();
     stream.flush().await.unwrap();
     stream.close().await.unwrap();
-    println!("Handling:finished");
+    println!("handle_connection_async: Handling:finished");
 }

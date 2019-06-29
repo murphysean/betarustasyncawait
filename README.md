@@ -34,31 +34,56 @@ Example Output
 
 ### Rust Server
 
-	Created epoll fd:5
-	AsyncTcpListener:Stream:Accept would block: Resource temporarily unavailable (os error 11)
-	ctl_add_rawfd
-	Added fd:4 to epollfd:5
-	Wait: 1 for 4
+	epoll:create epfd:5
+	epoll:ctl_add_rawfd fd:4 to epfd:5
+	epoll:wait: event:1 for fd:4
 	loop: Another round
-	AsyncTcpListener:Stream:Accept would block: Resource temporarily unavailable (os error 11)
-	ctl_mod_rawfd
-	Added fd:4 to epollfd:5
-	Handling:started...
-	AsyncStream:Read:Read would block: Resource temporarily unavailable (os error 11)
-	ctl_add_rawfd
-	Added fd:6 to epollfd:5
-	Wait: 1 for 6
-	loop: Another round
+	epoll:ctl_mod_rawfd fd:4 in epfd:5
+	handle_connection_async: Handling:started...
+
 	Request: GET / HTTP/1.1
 	Host: localhost:7878
 	User-Agent: curl/7.64.0
 	Accept: */*
 
 
-	Handling:finished
-	Dropping stream
-	ctl_del_rawfd
-	ctl_del_rawfd: fd:6 from epollfd:5
+
+	handle_connection_async: Handling:finished
+	epoll:ctl_del_rawfd:error: No such file or directory
+	epoll:wait: event:1 for fd:4
+	loop: Another round
+	epoll:ctl_mod_rawfd fd:4 in epfd:5
+	handle_connection_async: Handling:started...
+	epoll:ctl_add_rawfd fd:6 to epfd:5
+	epoll:wait: event:1 for fd:6
+	loop: Another round
+
+	Request: GET / HTTP/1.1
+	Host: localhost:7878
+	User-Agent: curl/7.64.0
+	Accept: */*
+
+
+
+	handle_connection_async: Handling:finished
+	epoll:ctl_del_rawfd: fd:6 from epfd:5
+	epoll:wait: event:1 for fd:4
+	loop: Another round
+	epoll:ctl_mod_rawfd fd:4 in epfd:5
+	handle_connection_async: Handling:started...
+	epoll:ctl_add_rawfd fd:6 to epfd:5
+	epoll:wait: event:1 for fd:6
+	loop: Another round
+
+	Request: GET / HTTP/1.1
+	Host: localhost:7878
+	User-Agent: curl/7.64.0
+	Accept: */*
+
+
+
+	handle_connection_async: Handling:finished
+	epoll:ctl_del_rawfd: fd:6 from epfd:5
 
 ### Connection
 
