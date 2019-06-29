@@ -28,3 +28,95 @@ Here are some websites I used:
 * http://man7.org/linux/man-pages/man7/epoll.7.html
 * https://docs.rs/epoll/4.1.0/epoll/struct.Events.html
 * https://docs.rs/libc/0.2.58/libc/index.html
+
+Example Output
+---
+
+### Rust Server
+
+	Created epoll fd:5
+	AsyncTcpListener:Stream:Accept would block: Resource temporarily unavailable (os error 11)
+	ctl_add_rawfd
+	Added fd:4 to epollfd:5
+	Wait: 1 for 4
+	loop: Another round
+	AsyncTcpListener:Stream:Accept would block: Resource temporarily unavailable (os error 11)
+	ctl_mod_rawfd
+	Added fd:4 to epollfd:5
+	Handling:started...
+	AsyncStream:Read:Read would block: Resource temporarily unavailable (os error 11)
+	ctl_add_rawfd
+	Added fd:6 to epollfd:5
+	Wait: 1 for 6
+	loop: Another round
+	Request: GET / HTTP/1.1
+	Host: localhost:7878
+	User-Agent: curl/7.64.0
+	Accept: */*
+
+
+	Handling:finished
+	Dropping stream
+	ctl_del_rawfd
+	ctl_del_rawfd: fd:6 from epollfd:5
+
+### Connection
+
+	smurphy-ml-6:~ seanmurphy$ curl -v localhost:7878
+	* Expire in 0 ms for 6 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 1 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	* Expire in 0 ms for 1 (transfer 0x7fd69700a200)
+	*   Trying ::1...
+	* TCP_NODELAY set
+	* Expire in 149999 ms for 3 (transfer 0x7fd69700a200)
+	* Expire in 200 ms for 4 (transfer 0x7fd69700a200)
+	* Connected to localhost (::1) port 7878 (#0)
+	> GET / HTTP/1.1
+	> Host: localhost:7878
+	> User-Agent: curl/7.64.0
+	> Accept: */*
+	>
+	< HTTP/1.1 200 OK
+	* no chunk, no close, no size. Assume close to signal end
+	<
+	* Closing connection 0
