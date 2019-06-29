@@ -8,7 +8,6 @@ use core::{
 use std::{
     collections::HashMap,
     convert::TryInto,
-    ffi::{CStr, CString},
     io,
     io::prelude::*,
     io::Error,
@@ -26,12 +25,19 @@ use futures::{
     io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt},
 };
 
+/// Look how easy it is to be async :)
 fn main() {
+    // Set up the listener using the standard library listener
+    // Looks easy and follows the same paradigm as blocking.
     let listener = TcpListener::bind("0.0.0.0:7878").unwrap();
+    // Now I wrap it up in a server.
     let mut server = Server::new(listener);
+    // This will block forever consuming new connections and handling them
+    // all asynchronously and on the same thread.
     server.run();
 }
 
+/// Wraps the epoll libc interface.
 struct Epoll {
     epfd: libc::c_int,
     wakers: Mutex<HashMap<RawFd, Vec<Waker>>>,
@@ -178,6 +184,8 @@ impl Drop for Epoll {
     }
 }
 
+/// Consumes and wraps a tcp listener. It will set it in a nonblocking mode. Only allows you to
+/// accept incoming connections via listener.incoming().
 struct AsyncTcpListener {
     listener: TcpListener,
     epoll: Rc<Epoll>,
@@ -204,6 +212,8 @@ impl Drop for AsyncTcpListener {
     }
 }
 
+/// The streaming version of an iterator over accepted tcp connections from the associated
+/// listener. Accessed via listener.incoming().
 struct Incoming<'a> {
     listener: &'a mut AsyncTcpListener,
 }
@@ -246,6 +256,12 @@ impl<'a> TryStream for Incoming<'a> {
     }
 }
 
+/// Consumes and wraps a tcp stream. It will set it in a nonblocking mode,
+/// and provides async versions of read, write, flush, and close from the
+/// futures-rs library. At the moment it also takes a reference to an epoll
+/// instance that is used under the hood to provide events and wake up the 
+/// poll methods. Since my impl is all on a single thread, I might be able to
+/// use thread local storage to register wakers with an epoll instance.
 struct AsyncTcpStream {
     stream: TcpStream,
     epoll: Rc<Epoll>,
@@ -387,6 +403,9 @@ impl AsyncWrite for AsyncTcpStream {
     }
 }
 
+/// A Server handles accepting new connections, and handling those connections asynchronously.
+/// It uses epoll, and a futures-rs local pool to do so on the same thread by only running the
+/// local pool until it is stalled.
 struct Server {
     listener: Option<AsyncTcpListener>,
     localPool: LocalPool,
@@ -394,6 +413,8 @@ struct Server {
 }
 
 impl Server {
+    /// Creating a new server will consume a tcp listener, turn it async and wrap it with a simple server
+    /// that will handle everything asynchronously
     pub fn new(listener: TcpListener) -> Server {
         let localPool = LocalPool::new();
         let epoll = Rc::new(Epoll::new());
@@ -404,6 +425,9 @@ impl Server {
         }
     }
 
+    /// The run function will block the thread while it accepts and handles incoming connections to
+    /// the associated handler. It uses a futures-rs executer to asynchronously handle everything on
+    /// the current thread.
     pub fn run(self: &mut Self) {
         //How do I get my stream to run on this executer, spawning for each new iteration?
         self.localPool.spawner()
@@ -412,24 +436,28 @@ impl Server {
             //Run the localPool as far as you can without blocking...
             self.localPool.run_until_stalled();
             //I'm now noticing that anything that was spawned didn't get grabbed ^ that round
+            //Let's run through it again to get all the newly spawned futures to call poll
             self.localPool.run_until_stalled();
-            //Now let epoll take over, epoll will block on all the fd it's gathered
+            //Ok now everything is just waiting on io...
+            //Let epoll take over, epoll will block on all the fd it's gathered
+            //when finished it will notify all the relevant wakers that had events
             self.epoll.wait(-1);
             //After epoll is done waiting, rerun the loop
-            //It has notified all the relevant wakers that had events
             println!("loop: Another round");
         }
     }
 }
 
+/// This future won't resolve... well maybe it should if someone calls close on the listener
+/// It's job is to loop over an async iterator (stream) of incoming connections.
+/// It will accept the connection, and spawn a new future to handle that connection.
 async fn accept_async(mut listener: AsyncTcpListener, mut spawner : LocalSpawner) {
     let mut incoming = listener.incoming();
     loop{
         let next = incoming.try_next().await;
         if let Ok(r) = next{
             if let Some(stream) = r{
-                let sc = spawner.clone();
-                spawner.spawn_local(handle_connection_async(stream, sc));
+                spawner.spawn_local(handle_connection_async(stream));
             }else{
                 println!("accept_async:error");
             }
@@ -439,7 +467,13 @@ async fn accept_async(mut listener: AsyncTcpListener, mut spawner : LocalSpawner
     }
 }
 
-async fn handle_connection_async(mut stream: AsyncTcpStream, spawner: LocalSpawner) {
+/// This function takes control of an asynctcpstream
+/// It will async read, write, flush, and eventually close the connection
+/// Eventually this function might handle the http protocol
+/// Read the incoming request, validate headers, create a request obj with a async reader attached
+/// to read the body. It could then find an associated handler registered to the server by path
+/// match and call it to get a response back. 
+async fn handle_connection_async(mut stream: AsyncTcpStream) {
     println!("handle_connection_async: Handling:started...");
     //stream.shutdown(Shutdown::Both);
     let mut buffer = [0u8; 2048];
