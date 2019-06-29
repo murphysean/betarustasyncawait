@@ -146,6 +146,15 @@ Example Output
 	<
 	* Closing connection 0
 
+Building
+---
+
+Requires linux and nightly so I'm going to show how to run it via docker
+
+	docker run -p 7878:7878 --rm -it -v $PWD:/usr/src/myapp -w /usr/src/myapp rust:latest /bin/bash
+	rustup override set nightly
+	cargo run
+
 Improvements
 ---
 
