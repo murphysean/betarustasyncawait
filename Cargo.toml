@@ -1,0 +1,9 @@
+[package]
+name = "rustasyncawait"
+version = "0.9.0"
+authors = ["Sean Murphy <murphysean84@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+futures-preview = { version = "0.3.0-alpha.16"}
+libc = "0.2"
