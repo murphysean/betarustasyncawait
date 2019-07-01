@@ -21,7 +21,7 @@ use std::{
 use futures::{
     executor::{LocalPool, LocalSpawner},
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    stream::{TryStream, TryStreamExt},
+    stream::{Stream, TryStreamExt},
     task::{LocalSpawnExt, Waker},
 };
 
@@ -218,13 +218,12 @@ struct Incoming<'a> {
     listener: &'a mut AsyncTcpListener,
 }
 
-impl<'a> TryStream for Incoming<'a> {
-    type Ok = AsyncTcpStream;
-    type Error = io::Error;
-    fn try_poll_next(
+impl<'a> Stream for Incoming<'a> {
+    type Item = Result<AsyncTcpStream, io::Error>;
+    fn poll_next(
         mut self: Pin<&mut Self>,
         cx: &mut Context,
-    ) -> Poll<Option<Result<Self::Ok, Self::Error>>> {
+    ) -> Poll<Option<Self::Item>> {
         let a = self.listener.listener.accept();
         match a {
             Ok((stream, _addr)) => Poll::Ready(Some(Ok(AsyncTcpStream::new(
