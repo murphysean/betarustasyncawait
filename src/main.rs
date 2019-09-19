@@ -289,7 +289,9 @@ impl AsyncTcpStream {
 
 impl Drop for AsyncTcpStream {
     fn drop(&mut self) {
-        self.epoll.ctl_del_rawfd(self.stream.as_raw_fd()).unwrap();
+        if self.eph {
+            self.epoll.ctl_del_rawfd(self.stream.as_raw_fd()).unwrap();
+        }
     }
 }
 
